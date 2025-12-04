@@ -471,10 +471,16 @@ def main():
         'simulation_results': dict(probabilities),
         'raw_simulations': serialized_simulations,
         'timestamp': datetime.now().isoformat(),
-        'sim_count': num_sims 
+
     }
     
-    output_file = 'intermediate_sim_data.json'
+
+    output_dir = 'output'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    output_file = os.path.join(output_dir, 'intermediate_sim_data.json')
+
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(intermediate_data, f, indent=None)

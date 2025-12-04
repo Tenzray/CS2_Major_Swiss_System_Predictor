@@ -382,7 +382,15 @@ def main():
     config = load_config()
     
     # 2. 初始化优化器
-    data_file = 'intermediate_sim_data.json'
+
+    data_file = os.path.join('output', 'intermediate_sim_data.json')
+    
+    # 这里加个检查，防止用户忘了先运行 preresult
+    if not os.path.exists(data_file):
+        print(f"[错误] 找不到数据文件: {data_file}")
+        print(f"       请先运行 python cs2_gen_preresult.py 生成模拟数据！")
+        return
+
     optimizer = PickemOptimizer(data_file, config)
     
     # 3. 运行
@@ -413,9 +421,16 @@ def main():
         'timestamp': datetime.now().isoformat(),
         'config_used': config
     }
-    with open('final_gpu_prediction.json', 'w', encoding='utf-8') as f:
+    
+    output_dir = 'output'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    output_path = os.path.join(output_dir, 'final_prediction.json')
+    
+    with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
-    print(f"\n[保存] 结果已保存至 final_gpu_prediction.json")
+    print(f"\n[保存] 结果已保存至 {output_path}")
 
 if __name__ == "__main__":
     main()
