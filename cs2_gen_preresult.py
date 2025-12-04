@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import multiprocessing
 import time
+import yaml
 
 # 占位符，将在main中初始化
 pd = None
@@ -66,12 +67,34 @@ BASE_ELO = 1000
 BASE_K_FACTOR = 40
 TIME_DECAY_DAYS = 50
 
-# 模拟参数
-NUM_SIMULATIONS = 100000  # Monte Carlo模拟次数
 
-# ============================================================================
-# 函数定义
-# ============================================================================
+
+def load_config():
+    """
+    加载配置文件，获取模拟次数
+    """
+    config_path = 'batchsize.yaml'
+    config = {
+        'simulation': {
+            'num_simulations': 100000 
+        }
+    }
+    
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                user_config = yaml.safe_load(f)
+                if user_config and 'simulation' in user_config:
+                    # 更新配置
+                    if 'num_simulations' in user_config['simulation']:
+                        config['simulation']['num_simulations'] = user_config['simulation']['num_simulations']
+                print(f"[配置] 已加载 {config_path}")
+        except Exception as e:
+            print(f"[警告] 加载配置文件失败: {e}，将使用默认值")
+    else:
+        print(f"[提示] 未找到 {config_path}，使用默认设置 (100,000次)")
+        
+    return config
 
 def load_team_ratings_from_file(filepath):
     """
@@ -382,9 +405,13 @@ def simulate_full_swiss(ratings, num_simulations=100000):
 
 def main():
     print("=" * 60)
-    print("CS2 Major 瑞士轮预测系统（Part 1: CPU 数据生成）")
+    print("CS2 Major 瑞士轮预测系统数据生成")
     print("=" * 60)
     print(f"[LOG] {datetime.now().strftime('%H:%M:%S')} - 程序启动", flush=True)
+    
+    config = load_config()
+    num_sims = config['simulation']['num_simulations']
+    print(f"[配置] 模拟次数设定为: {num_sims:,}")
     
     print("\n[1/4] 加载外部数据...")
     matches_df = pd.read_csv(MATCHES_FILE, header=0,
@@ -419,8 +446,8 @@ def main():
         
     elo_ratings = calculate_elo_ratings(matches_df, initial_ratings)
     
-    print(f"\n[3/4] 运行{NUM_SIMULATIONS:,}次瑞士轮模拟...")
-    probabilities, all_simulations = simulate_full_swiss(elo_ratings, num_simulations=NUM_SIMULATIONS)
+    print(f"\n[3/4] 运行{num_sims:,}次瑞士轮模拟...")
+    probabilities, all_simulations = simulate_full_swiss(elo_ratings, num_simulations=num_sims)
     
     print("\n模拟结果摘要:")
     sorted_results = sorted(probabilities.items(), key=lambda x: x[1]['qualified'], reverse=True)
@@ -430,7 +457,6 @@ def main():
     
     print("\n[4/4] 保存模拟数据供后续步骤使用...")
     
-    # 转换set为list以支持JSON序列化
     serialized_simulations = []
     for sim in all_simulations:
         serialized_simulations.append({
@@ -444,13 +470,14 @@ def main():
         'elo_ratings': dict(elo_ratings),
         'simulation_results': dict(probabilities),
         'raw_simulations': serialized_simulations,
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now().isoformat(),
+        'sim_count': num_sims 
     }
     
     output_file = 'intermediate_sim_data.json'
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(intermediate_data, f, indent=None) # 不缩进以减小文件体积
+            json.dump(intermediate_data, f, indent=None)
         print(f"[SUCCESS] 数据已保存至: {output_file}")
         print(f"包含 {len(serialized_simulations)} 条模拟记录，可用于GPU加速优化。")
     except Exception as e:
